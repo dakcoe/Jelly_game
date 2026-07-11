@@ -10,7 +10,8 @@ const Engine = Matter.Engine,
       Events = Matter.Events,
       Vector = Matter.Vector,
       Body = Matter.Body,
-      Bodies = Matter.Bodies;
+      Bodies = Matter.Bodies,
+      Query = Matter.Query;
 
 // 엔진 초기화 (터널링 방지 및 소프트 바디 안정성을 위해 iteration 대폭 증가)
 const engine = Engine.create({
@@ -38,6 +39,10 @@ const render = Render.create({
 render.options.wireframes = false;
 render.options.showAngleIndicator = false;
 
+// 렌더링 변수 추가
+let renderCupLeftTopX = 65, renderCupLeftTopY = 504;
+let renderCupRightTopX = 535, renderCupRightTopY = 504;
+
 // Custom 렌더링을 위해 기본 렌더링을 덮어쓸 수 있도록 설정
 // Matter.js Render 이벤트를 후킹합니다.
 Events.on(render, 'afterRender', function() {
@@ -46,10 +51,10 @@ Events.on(render, 'afterRender', function() {
     // 두들 스타일 컵(바구니) 렌더링
     // 물리 엔진 상의 cupLeft, cupRight, cupBottom의 교차점을 정확히 계산한 1:1 일치 좌표 (높이 더 낮춤)
     context.beginPath();
-    context.moveTo(65, 504); // 왼쪽 상단
+    context.moveTo(renderCupLeftTopX, renderCupLeftTopY); // 왼쪽 상단
     context.lineTo(148, 750); // 왼쪽 하단
     context.lineTo(452, 750); // 오른쪽 하단
-    context.lineTo(535, 504); // 오른쪽 상단
+    context.lineTo(renderCupRightTopX, renderCupRightTopY); // 오른쪽 상단
     
     // 외곽선 굵게
     context.lineWidth = 15;
@@ -187,6 +192,16 @@ Events.on(render, 'afterRender', function() {
         
         context.closePath();
         
+        // 조준 중인 젤리는 추가 레이어(아우라)로 강조
+        if (typeof hoveredJellyId !== 'undefined' && hoveredJellyId === jelly.center.jellyId) {
+            context.save();
+            context.lineWidth = 16;
+            context.strokeStyle = "rgba(255, 50, 50, 0.7)";
+            context.lineJoin = "round";
+            context.stroke();
+            context.restore();
+        }
+        
         // 그라데이션 및 색상 채우기
         const color = getJellyColor(jelly.level);
         context.fillStyle = color;
@@ -252,7 +267,7 @@ const cupBottom = Bodies.rectangle(300, 757.5, 304, 15, {
 });
 
 // 컵 왼쪽 벽 (렌더링 선과 완벽 일치: 두께 15px)
-const cupLeft = Bodies.rectangle(106.5, 627, 15, 260, { 
+let currentCupLeft = Bodies.rectangle(106.5, 627, 15, 260, { 
     isStatic: true, 
     angle: -0.3252, 
     friction: 0.8,
@@ -260,7 +275,7 @@ const cupLeft = Bodies.rectangle(106.5, 627, 15, 260, {
 });
 
 // 컵 오른쪽 벽 (렌더링 선과 완벽 일치: 두께 15px)
-const cupRight = Bodies.rectangle(493.5, 627, 15, 260, { 
+let currentCupRight = Bodies.rectangle(493.5, 627, 15, 260, { 
     isStatic: true, 
     angle: 0.3252, 
     friction: 0.8,
@@ -268,10 +283,10 @@ const cupRight = Bodies.rectangle(493.5, 627, 15, 260, {
 });
 
 // 컵 양쪽 끝 뾰족한 단면이 젤리를 찌르지 못하도록 뭉툭한 범퍼(캡)를 씌웁니다
-const cupLeftTop = Bodies.circle(65, 504, 15, { isStatic: true, friction: 0.8, render: { visible: false } });
-const cupRightTop = Bodies.circle(535, 504, 15, { isStatic: true, friction: 0.8, render: { visible: false } });
+let currentCupLeftTop = Bodies.circle(65, 504, 15, { isStatic: true, friction: 0.8, render: { visible: false } });
+let currentCupRightTop = Bodies.circle(535, 504, 15, { isStatic: true, friction: 0.8, render: { visible: false } });
 
-World.add(engine.world, [groundFloor, cupBottom, cupLeft, cupRight, cupLeftTop, cupRightTop]);
+World.add(engine.world, [groundFloor, cupBottom, currentCupLeft, currentCupRight, currentCupLeftTop, currentCupRightTop]);
 
 // 젤리 설정 (끝없이 진화하도록 함수 기반으로 변경)
 const JELLY_COLORS = [
@@ -414,28 +429,184 @@ function createJelly(x, y, level) {
 let currentX = width / 2;
 let nextLevel = Math.floor(Math.random() * 3);
 
-const mouse = Mouse.create(render.canvas);
-const mouseConstraint = MouseConstraint.create(engine, {
-    mouse: mouse,
-    constraint: {
-        stiffness: 0.2,
-        render: { visible: false }
-    }
+// 특수 스킬 로직
+let isWallExtended = false;
+let extendWallTimeLeft = 0;
+let isDeleteMode = false;
+let visualParticles = [];
+let currentY = 50;
+let hoveredJellyId = null;
+
+const extendBtn = document.getElementById('skill-extend-btn');
+const deleteBtn = document.getElementById('skill-delete-btn');
+const extendTimerEl = document.getElementById('skill-extend-timer');
+
+extendBtn.addEventListener('click', () => {
+    if (isWallExtended || isGameOver || extendBtn.disabled) return;
+    
+    isWallExtended = true;
+    extendBtn.disabled = true;
+    
+    const targetLeftTopX = 23.5, targetLeftTopY = 381;
+    const targetRightTopX = 576.5, targetRightTopY = 381;
+    const startLeftTopX = 65, startLeftTopY = 504;
+    const startRightTopX = 535, startRightTopY = 504;
+    
+    extendWallTimeLeft = 20;
+    extendTimerEl.textContent = extendWallTimeLeft;
+    extendTimerEl.classList.remove('hidden');
+    
+    const timerInterval = setInterval(() => {
+        if (isGameOver) {
+            clearInterval(timerInterval);
+            extendWallTimeLeft = 0;
+            extendTimerEl.classList.add('hidden');
+            return;
+        }
+        extendWallTimeLeft--;
+        extendTimerEl.textContent = extendWallTimeLeft;
+        if (extendWallTimeLeft <= 0) {
+            clearInterval(timerInterval);
+            extendTimerEl.classList.add('hidden');
+        }
+    }, 1000);
+    
+    let progress = 0;
+    const animInterval = setInterval(() => {
+        progress += 0.05;
+        if (progress >= 1) {
+            progress = 1;
+            clearInterval(animInterval);
+        }
+        
+        renderCupLeftTopX = startLeftTopX + (targetLeftTopX - startLeftTopX) * progress;
+        renderCupLeftTopY = startLeftTopY + (targetLeftTopY - startLeftTopY) * progress;
+        renderCupRightTopX = startRightTopX + (targetRightTopX - startRightTopX) * progress;
+        renderCupRightTopY = startRightTopY + (targetRightTopY - startRightTopY) * progress;
+        
+        World.remove(engine.world, [currentCupLeft, currentCupRight, currentCupLeftTop, currentCupRightTop]);
+        
+        const currentLength = 260 + (130 * progress);
+        const leftCenterX = (148 + renderCupLeftTopX) / 2;
+        const leftCenterY = (750 + renderCupLeftTopY) / 2;
+        const rightCenterX = (452 + renderCupRightTopX) / 2;
+        const rightCenterY = (750 + renderCupRightTopY) / 2;
+        
+        currentCupLeft = Bodies.rectangle(leftCenterX, leftCenterY, 15, currentLength, { isStatic: true, angle: -0.3252, friction: 0.8, render: { visible: false } });
+        currentCupRight = Bodies.rectangle(rightCenterX, rightCenterY, 15, currentLength, { isStatic: true, angle: 0.3252, friction: 0.8, render: { visible: false } });
+        currentCupLeftTop = Bodies.circle(renderCupLeftTopX, renderCupLeftTopY, 15, { isStatic: true, friction: 0.8, render: { visible: false } });
+        currentCupRightTop = Bodies.circle(renderCupRightTopX, renderCupRightTopY, 15, { isStatic: true, friction: 0.8, render: { visible: false } });
+        
+        World.add(engine.world, [currentCupLeft, currentCupRight, currentCupLeftTop, currentCupRightTop]);
+    }, 16);
+    
+    setTimeout(() => {
+        if (isGameOver) return;
+        
+        let backProgress = 0;
+        const backInterval = setInterval(() => {
+            backProgress += 0.05;
+            if (backProgress >= 1) {
+                backProgress = 1;
+                clearInterval(backInterval);
+                isWallExtended = false;
+            }
+            
+            const p = 1 - backProgress;
+            renderCupLeftTopX = startLeftTopX + (targetLeftTopX - startLeftTopX) * p;
+            renderCupLeftTopY = startLeftTopY + (targetLeftTopY - startLeftTopY) * p;
+            renderCupRightTopX = startRightTopX + (targetRightTopX - startRightTopX) * p;
+            renderCupRightTopY = startRightTopY + (targetRightTopY - startRightTopY) * p;
+            
+            World.remove(engine.world, [currentCupLeft, currentCupRight, currentCupLeftTop, currentCupRightTop]);
+            
+            const currentLength = 260 + (130 * p);
+            const leftCenterX = (148 + renderCupLeftTopX) / 2;
+            const leftCenterY = (750 + renderCupLeftTopY) / 2;
+            const rightCenterX = (452 + renderCupRightTopX) / 2;
+            const rightCenterY = (750 + renderCupRightTopY) / 2;
+            
+            currentCupLeft = Bodies.rectangle(leftCenterX, leftCenterY, 15, currentLength, { isStatic: true, angle: -0.3252, friction: 0.8, render: { visible: false } });
+            currentCupRight = Bodies.rectangle(rightCenterX, rightCenterY, 15, currentLength, { isStatic: true, angle: 0.3252, friction: 0.8, render: { visible: false } });
+            currentCupLeftTop = Bodies.circle(renderCupLeftTopX, renderCupLeftTopY, 15, { isStatic: true, friction: 0.8, render: { visible: false } });
+            currentCupRightTop = Bodies.circle(renderCupRightTopX, renderCupRightTopY, 15, { isStatic: true, friction: 0.8, render: { visible: false } });
+            
+            World.add(engine.world, [currentCupLeft, currentCupRight, currentCupLeftTop, currentCupRightTop]);
+        }, 16);
+    }, 20000);
 });
-World.add(engine.world, mouseConstraint);
+
+deleteBtn.addEventListener('click', () => {
+    if (isDeleteMode || deleteBtn.disabled || isGameOver) return;
+    isDeleteMode = true;
+    deleteBtn.classList.add('active-skill');
+    document.getElementById('game-container').classList.add('crosshair-mode');
+});
+
+// 마우스 드래그 이동을 비활성화하기 위해 MouseConstraint 제거
+// const mouse = Mouse.create(render.canvas);
+// const mouseConstraint = MouseConstraint.create(engine, {
+//     mouse: mouse,
+//     constraint: {
+//         stiffness: 0.2,
+//         render: { visible: false }
+//     }
+// });
+// World.add(engine.world, mouseConstraint);
 
 // 드롭 인터랙션
 let canDrop = true;
 
-// 가이드라인 렌더링
+// 가이드라인 및 파티클 렌더링
 Events.on(render, 'afterRender', function() {
-    if (!canDrop || isGameOver) return;
     const context = render.context;
+    
+    // 파티클 렌더링
+    for (let i = visualParticles.length - 1; i >= 0; i--) {
+        let p = visualParticles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.01; // 100 frames
+        
+        if (p.life <= 0) {
+            visualParticles.splice(i, 1);
+            continue;
+        }
+        
+        context.beginPath();
+        context.arc(p.x, p.y, p.radius * p.life, 0, Math.PI * 2);
+        context.strokeStyle = `rgba(180, 180, 180, ${p.life})`;
+        context.lineWidth = 3;
+        context.stroke();
+    }
+    
+    if (isDeleteMode) {
+        // 화면 어둡게
+        context.fillStyle = "rgba(0, 0, 0, 0.6)";
+        context.fillRect(0, 0, width, height);
+        
+        // 조준선 (Crosshair)
+        context.beginPath();
+        context.moveTo(currentX - 40, currentY);
+        context.lineTo(currentX + 40, currentY);
+        context.moveTo(currentX, currentY - 40);
+        context.lineTo(currentX, currentY + 40);
+        context.strokeStyle = "red";
+        context.lineWidth = 3;
+        context.stroke();
+        
+        context.beginPath();
+        context.arc(currentX, currentY, 25, 0, Math.PI * 2);
+        context.stroke();
+        return;
+    }
+    
+    if (!canDrop || isGameOver) return;
     
     context.beginPath();
     context.moveTo(currentX, 50);
     context.lineTo(currentX, 800);
-    context.strokeStyle = "rgba(255, 255, 255, 0.2)";
+    context.strokeStyle = "rgba(0, 0, 0, 0.3)";
     context.lineWidth = 2;
     context.setLineDash([10, 10]);
     context.stroke();
@@ -454,14 +625,89 @@ Events.on(render, 'afterRender', function() {
 render.canvas.addEventListener('mousemove', (e) => {
     const rect = render.canvas.getBoundingClientRect();
     const scaleX = render.canvas.width / rect.width;
+    const scaleY = render.canvas.height / rect.height;
     currentX = (e.clientX - rect.left) * scaleX;
+    currentY = (e.clientY - rect.top) * scaleY;
     
-    // 좌우 한계선 (컵 바깥쪽으로 드롭 가능하도록 확장)
-    currentX = Math.max(30, Math.min(570, currentX));
+    if (isDeleteMode) {
+        // 조준 모드에서는 마우스 위치에 있는 젤리 식별
+        const bodies = Composite.allBodies(engine.world);
+        const hoveredBodies = Query.point(bodies, { x: currentX, y: currentY });
+        hoveredJellyId = null;
+        for (let b of hoveredBodies) {
+            if (b.jellyId !== undefined) {
+                hoveredJellyId = b.jellyId;
+                break;
+            }
+        }
+    } else {
+        // 좌우 한계선 (조준 모드가 아닐 때만 적용)
+        currentX = Math.max(30, Math.min(570, currentX));
+        hoveredJellyId = null;
+    }
 });
 
 render.canvas.addEventListener('click', (e) => {
-    if (!canDrop || isGameOver) return;
+    if (isGameOver) return;
+    
+    if (isDeleteMode) {
+        const rect = render.canvas.getBoundingClientRect();
+        const scaleX = render.canvas.width / rect.width;
+        const scaleY = render.canvas.height / rect.height;
+        const clickX = (e.clientX - rect.left) * scaleX;
+        const clickY = (e.clientY - rect.top) * scaleY;
+        
+        const bodies = Composite.allBodies(engine.world);
+        const clicked = Query.point(bodies, { x: clickX, y: clickY });
+        
+        let jellyIdToRemove = null;
+        for (let body of clicked) {
+            if (body.jellyId !== undefined) {
+                jellyIdToRemove = body.jellyId;
+                break;
+            }
+        }
+        
+        if (jellyIdToRemove !== null) {
+            const jelly = jellies[jellyIdToRemove];
+            if (jelly && !jelly.isMerged) {
+                // 파티클 생성
+                const jX = jelly.center.position.x;
+                const jY = jelly.center.position.y;
+                const jR = getJellySize(jelly.level);
+                for (let i = 0; i < 20; i++) {
+                    visualParticles.push({
+                        x: jX + (Math.random() - 0.5) * jR,
+                        y: jY + (Math.random() - 0.5) * jR,
+                        vx: (Math.random() - 0.5) * 6,
+                        vy: (Math.random() - 0.5) * 6,
+                        radius: Math.random() * 12 + 5,
+                        life: 1.0
+                    });
+                }
+                
+                World.remove(engine.world, jelly.composite);
+                delete jellies[jellyIdToRemove];
+                
+                isDeleteMode = false;
+                hoveredJellyId = null;
+                deleteBtn.classList.remove('active-skill');
+                deleteBtn.disabled = true;
+                document.getElementById('game-container').classList.remove('crosshair-mode');
+                
+                // 1회용이므로 다시 활성화하지 않음
+            }
+        } else {
+            // 빈 공간 클릭 시 취소
+            isDeleteMode = false;
+            hoveredJellyId = null;
+            deleteBtn.classList.remove('active-skill');
+            document.getElementById('game-container').classList.remove('crosshair-mode');
+        }
+        return;
+    }
+
+    if (!canDrop) return;
     
     createJelly(currentX, 50, nextLevel);
     
@@ -601,6 +847,27 @@ document.getElementById('restart-btn').addEventListener('click', () => {
     isGameOver = false;
     document.getElementById('game-over-screen').classList.add('hidden');
     canDrop = true;
+    
+    // 스킬 초기화
+    isWallExtended = false;
+    extendWallTimeLeft = 0;
+    extendTimerEl.classList.add('hidden');
+    isDeleteMode = false;
+    visualParticles = [];
+    extendBtn.disabled = false;
+    deleteBtn.disabled = false;
+    deleteBtn.classList.remove('active-skill');
+    document.getElementById('game-container').classList.remove('crosshair-mode');
+    
+    // 컵 원상복구
+    World.remove(engine.world, [currentCupLeft, currentCupRight, currentCupLeftTop, currentCupRightTop]);
+    renderCupLeftTopX = 65; renderCupLeftTopY = 504;
+    renderCupRightTopX = 535; renderCupRightTopY = 504;
+    currentCupLeft = Bodies.rectangle(106.5, 627, 15, 260, { isStatic: true, angle: -0.3252, friction: 0.8, render: { visible: false } });
+    currentCupRight = Bodies.rectangle(493.5, 627, 15, 260, { isStatic: true, angle: 0.3252, friction: 0.8, render: { visible: false } });
+    currentCupLeftTop = Bodies.circle(65, 504, 15, { isStatic: true, friction: 0.8, render: { visible: false } });
+    currentCupRightTop = Bodies.circle(535, 504, 15, { isStatic: true, friction: 0.8, render: { visible: false } });
+    World.add(engine.world, [currentCupLeft, currentCupRight, currentCupLeftTop, currentCupRightTop]);
 });
 
 // 엔진 실행
