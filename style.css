@@ -1,0 +1,140 @@
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: #f5f5f5;
+    background-image: 
+        linear-gradient(rgba(0, 0, 0, 0.05) 2px, transparent 2px),
+        linear-gradient(90deg, rgba(0, 0, 0, 0.05) 2px, transparent 2px);
+    background-size: 40px 40px;
+    color: #000;
+    font-family: 'Fredoka One', 'Comic Sans MS', cursive, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#game-container {
+    position: relative;
+    width: 100%;
+    max-width: 600px;
+    height: 100%;
+    max-height: 900px;
+    background: transparent;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+#ui-layer {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    pointer-events: none;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+#score-board {
+    font-size: 32px;
+    color: #00ff44;
+    text-shadow: 
+        -3px -3px 0 #000,
+         3px -3px 0 #000,
+        -3px  3px 0 #000,
+         3px  3px 0 #000;
+    letter-spacing: 2px;
+}
+
+#best-score {
+    font-size: 24px;
+    color: #fff;
+    text-shadow: 
+        -2px -2px 0 #000,
+         2px -2px 0 #000,
+        -2px  2px 0 #000,
+         2px  2px 0 #000;
+}
+
+#game-over-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.7);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 20;
+    backdrop-filter: blur(5px);
+    transition: opacity 0.3s ease;
+}
+
+#game-over-screen.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+#game-over-screen h1 {
+    font-size: 64px;
+    margin-bottom: 20px;
+    color: #fff;
+    text-shadow: 
+        -4px -4px 0 #000,
+         4px -4px 0 #000,
+        -4px  4px 0 #000,
+         4px  4px 0 #000,
+         0px  8px 0 rgba(0,0,0,0.5);
+}
+
+#game-over-screen p {
+    font-size: 32px;
+    margin-bottom: 30px;
+    color: #fff;
+    text-shadow: 
+        -2px -2px 0 #000,
+         2px -2px 0 #000,
+        -2px  2px 0 #000,
+         2px  2px 0 #000;
+}
+
+#restart-btn {
+    padding: 15px 40px;
+    font-size: 28px;
+    font-family: 'Fredoka One', cursive;
+    color: #fff;
+    background: #ff3366;
+    border: 4px solid #000;
+    border-radius: 15px;
+    cursor: pointer;
+    box-shadow: 0 8px 0 #000;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+#restart-btn:hover {
+    transform: translateY(2px);
+    box-shadow: 0 6px 0 #000;
+}
+
+#restart-btn:active {
+    transform: translateY(8px);
+    box-shadow: 0 0 0 #000;
+}
