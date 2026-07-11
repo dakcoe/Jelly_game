@@ -46,10 +46,10 @@ Events.on(render, 'afterRender', function() {
     // 두들 스타일 컵(바구니) 렌더링
     // 물리 엔진 상의 cupLeft, cupRight, cupBottom의 교차점을 정확히 계산한 1:1 일치 좌표 (높이 더 낮춤)
     context.beginPath();
-    context.moveTo(111, 504); // 왼쪽 상단
+    context.moveTo(65, 504); // 왼쪽 상단
     context.lineTo(148, 750); // 왼쪽 하단
     context.lineTo(452, 750); // 오른쪽 하단
-    context.lineTo(489, 504); // 오른쪽 상단
+    context.lineTo(535, 504); // 오른쪽 상단
     
     // 외곽선 굵게
     context.lineWidth = 15;
@@ -252,24 +252,24 @@ const cupBottom = Bodies.rectangle(300, 757.5, 304, 15, {
 });
 
 // 컵 왼쪽 벽 (렌더링 선과 완벽 일치: 두께 15px)
-const cupLeft = Bodies.rectangle(129.5, 627, 15, 250, { 
+const cupLeft = Bodies.rectangle(106.5, 627, 15, 260, { 
     isStatic: true, 
-    angle: -0.1494, 
+    angle: -0.3252, 
     friction: 0.8,
     render: { visible: false } 
 });
 
 // 컵 오른쪽 벽 (렌더링 선과 완벽 일치: 두께 15px)
-const cupRight = Bodies.rectangle(470.5, 627, 15, 250, { 
+const cupRight = Bodies.rectangle(493.5, 627, 15, 260, { 
     isStatic: true, 
-    angle: 0.1494, 
+    angle: 0.3252, 
     friction: 0.8,
     render: { visible: false } 
 });
 
 // 컵 양쪽 끝 뾰족한 단면이 젤리를 찌르지 못하도록 뭉툭한 범퍼(캡)를 씌웁니다
-const cupLeftTop = Bodies.circle(111, 504, 15, { isStatic: true, friction: 0.8, render: { visible: false } });
-const cupRightTop = Bodies.circle(489, 504, 15, { isStatic: true, friction: 0.8, render: { visible: false } });
+const cupLeftTop = Bodies.circle(65, 504, 15, { isStatic: true, friction: 0.8, render: { visible: false } });
+const cupRightTop = Bodies.circle(535, 504, 15, { isStatic: true, friction: 0.8, render: { visible: false } });
 
 World.add(engine.world, [groundFloor, cupBottom, cupLeft, cupRight, cupLeftTop, cupRightTop]);
 
