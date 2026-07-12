@@ -622,15 +622,14 @@ Events.on(render, 'afterRender', function() {
     context.stroke();
 });
 
-render.canvas.addEventListener('mousemove', (e) => {
+function handleMove(clientX, clientY) {
     const rect = render.canvas.getBoundingClientRect();
     const scaleX = render.canvas.width / rect.width;
     const scaleY = render.canvas.height / rect.height;
-    currentX = (e.clientX - rect.left) * scaleX;
-    currentY = (e.clientY - rect.top) * scaleY;
+    currentX = (clientX - rect.left) * scaleX;
+    currentY = (clientY - rect.top) * scaleY;
     
     if (isDeleteMode) {
-        // 조준 모드에서는 마우스 위치에 있는 젤리 식별
         const bodies = Composite.allBodies(engine.world);
         const hoveredBodies = Query.point(bodies, { x: currentX, y: currentY });
         hoveredJellyId = null;
@@ -641,21 +640,38 @@ render.canvas.addEventListener('mousemove', (e) => {
             }
         }
     } else {
-        // 좌우 한계선 (조준 모드가 아닐 때만 적용)
         currentX = Math.max(30, Math.min(570, currentX));
         hoveredJellyId = null;
     }
+}
+
+render.canvas.addEventListener('mousemove', (e) => {
+    handleMove(e.clientX, e.clientY);
 });
 
-render.canvas.addEventListener('click', (e) => {
+render.canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (e.touches.length > 0) {
+        handleMove(e.touches[0].clientX, e.touches[0].clientY);
+    }
+}, { passive: false });
+
+render.canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (e.touches.length > 0) {
+        handleMove(e.touches[0].clientX, e.touches[0].clientY);
+    }
+}, { passive: false });
+
+function handleAction(clientX, clientY) {
     if (isGameOver) return;
     
     if (isDeleteMode) {
         const rect = render.canvas.getBoundingClientRect();
         const scaleX = render.canvas.width / rect.width;
         const scaleY = render.canvas.height / rect.height;
-        const clickX = (e.clientX - rect.left) * scaleX;
-        const clickY = (e.clientY - rect.top) * scaleY;
+        const clickX = (clientX - rect.left) * scaleX;
+        const clickY = (clientY - rect.top) * scaleY;
         
         const bodies = Composite.allBodies(engine.world);
         const clicked = Query.point(bodies, { x: clickX, y: clickY });
@@ -671,7 +687,6 @@ render.canvas.addEventListener('click', (e) => {
         if (jellyIdToRemove !== null) {
             const jelly = jellies[jellyIdToRemove];
             if (jelly && !jelly.isMerged) {
-                // 파티클 생성
                 const jX = jelly.center.position.x;
                 const jY = jelly.center.position.y;
                 const jR = getJellySize(jelly.level);
@@ -694,11 +709,8 @@ render.canvas.addEventListener('click', (e) => {
                 deleteBtn.classList.remove('active-skill');
                 deleteBtn.disabled = true;
                 document.getElementById('game-container').classList.remove('crosshair-mode');
-                
-                // 1회용이므로 다시 활성화하지 않음
             }
         } else {
-            // 빈 공간 클릭 시 취소
             isDeleteMode = false;
             hoveredJellyId = null;
             deleteBtn.classList.remove('active-skill');
@@ -714,11 +726,21 @@ render.canvas.addEventListener('click', (e) => {
     canDrop = false;
     nextLevel = Math.floor(Math.random() * 3);
     
-    // 쿨타임
     setTimeout(() => {
         canDrop = true;
     }, 1000);
+}
+
+render.canvas.addEventListener('click', (e) => {
+    handleAction(e.clientX, e.clientY);
 });
+
+render.canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (e.changedTouches.length > 0) {
+        handleAction(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+    }
+}, { passive: false });
 
 // 충돌 이벤트 (병합 및 게임오버)
 let mergeQueue = [];
