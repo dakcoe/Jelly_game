@@ -434,7 +434,7 @@ let isWallExtended = false;
 let extendWallTimeLeft = 0;
 let isDeleteMode = false;
 let visualParticles = [];
-let currentY = 50;
+let currentY = 80;
 let hoveredJellyId = null;
 
 const extendBtn = document.getElementById('skill-extend-btn');
@@ -604,7 +604,7 @@ Events.on(render, 'afterRender', function() {
     if (!canDrop || isGameOver) return;
     
     context.beginPath();
-    context.moveTo(currentX, 50);
+    context.moveTo(currentX, 80);
     context.lineTo(currentX, 800);
     context.strokeStyle = "rgba(0, 0, 0, 0.3)";
     context.lineWidth = 2;
@@ -614,7 +614,7 @@ Events.on(render, 'afterRender', function() {
     
     // 다음 드롭될 젤리 미리보기 (실제 물리 충돌 범위인 1.4배 크기 반영)
     context.beginPath();
-    context.arc(currentX, 50, getJellySize(nextLevel) * 1.4, 0, 2 * Math.PI);
+    context.arc(currentX, 80, getJellySize(nextLevel) * 1.4, 0, 2 * Math.PI);
     context.fillStyle = getJellyColor(nextLevel);
     context.fill();
     context.lineWidth = 4;
@@ -721,7 +721,7 @@ function handleAction(clientX, clientY) {
 
     if (!canDrop) return;
     
-    createJelly(currentX, 50, nextLevel);
+    createJelly(currentX, 80, nextLevel);
     
     canDrop = false;
     nextLevel = Math.floor(Math.random() * 3);
